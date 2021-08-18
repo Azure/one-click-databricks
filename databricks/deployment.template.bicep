@@ -16,6 +16,7 @@ param LogAWkspId string
 param LogAWkspKey string
 param storageKey string
 param evenHubKey string
+param eventHubId string
 
 resource createAdbPATToken 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   name: 'createAdbPATToken'
@@ -137,6 +138,10 @@ resource uploadFilesToAdb 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
       {
         name: 'ADB_WORKSPACE_ID'
         value: adb_workspace_id
+      }
+      {
+        name: 'EVENT_HUB_ID'
+        value: eventHubId
       }
     ]
     scriptContent: loadTextContent('deployment/pre_cluster_create.sh')

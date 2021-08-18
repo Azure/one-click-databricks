@@ -272,6 +272,7 @@ module createDatabricksCluster './databricks/deployment.template.bicep' = {
     LogAWkspKey: loganalytics.outputs.primarySharedKey
     storageKey: adlsGen2.outputs.key1
     evenHubKey: eventHubLogging.outputs.eHPConnString
+    eventHubId: eventHubLogging.outputs.eHubNameId
   }
 }
 
