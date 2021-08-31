@@ -51,7 +51,6 @@ resource publicIpAddressName_resource 'Microsoft.Network/publicIPAddresses@2021-
   }
   properties: {
     publicIPAllocationMethod: 'Static'
-    
   }
 }
 
@@ -72,8 +71,8 @@ resource firewallName_resource 'Microsoft.Network/azureFirewalls@2021-02-01' = {
         }
       }
     ]
-    hubIPAddresses:{
-      publicIPs:{
+    hubIPAddresses: {
+      publicIPs: {
         count: fwpublicipcount
       }
     }
@@ -390,8 +389,8 @@ resource firewallName_resource 'Microsoft.Network/azureFirewalls@2021-02-01' = {
               ]
               fqdnTags: []
               targetFqdns: [
-                '${replace(replace(environment().authentication.loginEndpoint,'https:',''),'/','')}'
-                '${replace(replace(environment().resourceManager,'https:',''),'/','')}'
+                '${replace(replace(environment().authentication.loginEndpoint, 'https:', ''), '/', '')}'
+                '${replace(replace(environment().resourceManager, 'https:', ''), '/', '')}'
                 '*.blob.${environment().suffixes.storage}'
                 '*.azure-automation.net'
                 'ml.azure.com'
@@ -409,4 +408,4 @@ resource firewallName_resource 'Microsoft.Network/azureFirewalls@2021-02-01' = {
   }
 }
 
-output firewallPrivateIp string = firewallName_resource.properties.ipConfigurations[0].properties.privateIPAddress// output firewallPublivIp array = firewallName_resource.properties.hubIPAddresses.publicIPs.addresses
+output firewallPrivateIp string = firewallName_resource.properties.ipConfigurations[0].properties.privateIPAddress // output firewallPublivIp array = firewallName_resource.properties.hubIPAddresses.publicIPs.addresses

@@ -196,18 +196,14 @@ resource Wksp 'Microsoft.OperationalInsights/workspaces@2020-10-01' = {
 }
 
 resource WkspSearch 'Microsoft.OperationalInsights/workspaces/savedSearches@2020-08-01' = [for (item, i) in queries: {
-  name: '${logAnalyticsWkspName}/${guid('${resourceGroup().id}${deployment().name}${i}')}'
+  parent: Wksp
+  name: '${guid('${resourceGroup().id}${deployment().name}${i}')}'
   properties: {
     category: 'Spark Metrics'
     displayName: item.displayName
     query: item.query
-    version: 2
     etag: '*'
   }
-  dependsOn: [
-    Wksp
-  ]
-  
 }]
 
 var keyObj = listKeys(resourceId('Microsoft.OperationalInsights/workspaces', logAnalyticsWkspName), '2020-10-01')

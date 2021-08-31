@@ -3,7 +3,7 @@ targetScope = 'subscription'
 @minLength(2)
 @maxLength(4)
 @description('2-4 chars to prefix the Azure resources, NOTE: no number or symbols')
-param prefix string = 'ab'
+param prefix string = 'sri'
 
 @description('Client PC username, NOTE: do not use admin')
 param adminUsername string
@@ -13,6 +13,38 @@ param adminUsername string
 @secure()
 param adminPassword string
 
+var uniqueSubString = '${uniqueString(guid(subscription().subscriptionId))}'
+var uString = '${prefix}${uniqueSubString}'
+
+param linkAkstoAml bool = true
+param deployADBCluster bool = true
+param updateAKVKeys bool = true
+
+// ADB Config
+param adb_pat_lifetime string = '3600'
+param adb_cluster_name string = 'test-cluster-01'
+param adb_spark_version string = '7.3.x-scala2.12'
+param adb_node_type string = 'Standard_D3_v2'
+param adb_num_worker string = '3'
+param adb_auto_terminate_min string = '30'
+
+var storageAccountName = '${substring(uString, 0, 10)}stg01'
+var keyVaultName = '${substring(uString, 0, 6)}-akv-00'
+var resourceGroupName = '${substring(uString, 0, 6)}-rg'
+var adbWorkspaceName = '${substring(uString, 0, 6)}-AdbWksp'
+var nsgName = '${substring(uString, 0, 6)}-nsg'
+var firewallName = '${substring(uString, 0, 6)}-HubFW'
+var firewallPublicIpName = '${substring(uString, 0, 6)}-FWPIp'
+var fwRoutingTable = '${substring(uString, 0, 6)}-AdbRoutingTbl'
+var clientPcName = '${substring(uString, 0, 6)}-ClientPc'
+var eHNameSpace = '${substring(uString, 0, 6)}-eh'
+var adbAkvLinkName = '${substring(uString, 0, 6)}SecretScope'
+var amlWorkspaceName = '${substring(uString, 0, 6)}-AmlWksp'
+var containerRegistryName = '${substring(uString, 0, 6)}registry' //Resource names may contain alpha numeric characters only and must be between 5 and 50 characters. 
+var applicationInsightsName = '${substring(uString, 0, 6)}-AppInsights'
+var sslLeafName = '${toLower(substring(uString, 0, 6))}'
+var aksAmlComputeName = 'aks-${substring(uString, 0, 6)}'
+
 @description('The number of nodes for the cluster.')
 @minValue(3)
 @maxValue(50)
@@ -21,28 +53,7 @@ param aksAgentCount int = 3
 @description('The size of the VM instances')
 param aksAgentVMSize string = 'Standard_A4_v2'
 
-var uniqueSubString = '${uniqueString(guid(subscription().subscriptionId))}'
-var uString = '${prefix}${uniqueSubString}'
-
-// @description('Default storage suffix core - core.windows.net')
-// var storageSuffix = environment().suffixes.storage
-
-var storageAccountName = '${substring(uString, 0, 10)}stg01'
-var keyVaultName = '${substring(uString, 0, 6)}akv00'
-var resourceGroupName = '${substring(uString, 0, 6)}-rg'
-var adbWorkspaceName = '${substring(uString, 0, 6)}AdbWksp'
-var nsgName = '${substring(uString, 0, 6)}nsg'
-var firewallName = '${substring(uString, 0, 6)}HubFW'
-var firewallPublicIpName = '${substring(uString, 0, 6)}FWPIp'
-var fwRoutingTable = '${substring(uString, 0, 6)}AdbRoutingTbl'
-var clientPcName = '${substring(uString, 0, 6)}ClientPc'
-var eHNameSpace = '${substring(uString, 0, 6)}eh'
-var adbAkvLinkName = '${substring(uString, 0, 6)}SecretScope'
-var amlWorkspaceName = '${substring(uString, 0, 6)}AmlWksp'
-var containerRegistryName = '${substring(uString, 0, 6)}registry'
-var applicationInsightsName = '${substring(uString, 0, 6)}AppInsights'
-var sslLeafName = '${toLower(substring(uString, 0, 6))}'
-var aksAmlComputeName = 'aks-for-aml'
+var aksDNSPrefix  = '${toLower(substring(uString, 0, 6))}'
 // var routeTableName = 'RouteTable'
 // creating the event hub same as namespace
 var eventHubName = eHNameSpace
@@ -60,7 +71,7 @@ param HubVnetCidr string = '10.0.0.0/16'
 param FirewallSubnetCidr string = '10.0.1.0/26'
 @description('')
 param clientDevicesSubnetCidr string = '10.0.200.0/24'
-// Divide 10.179.0.0/16 into 4 group for simplicity, each with 16382 address
+// Divide 10.179.0.0/16 into 4 group for simplicity, each with 16,382 address
 // 10.179.0.0/18
 // 10.179.64.0/18
 // 10.179.128.0/18
@@ -244,16 +255,17 @@ module privateEndPoints './network/privateendpoint.template.bicep' = {
   scope: rg
   name: 'PrivateEndPoints'
   params: {
-    keyvaultName: keyVault.name
     keyvaultPrivateLinkResource: keyVault.outputs.keyvault_id
     privateLinkSubnetId: vnets.outputs.privatelinksubnet_id
     storageAccountName: adlsGen2.name
     storageAccountPrivateLinkResource: adlsGen2.outputs.storageaccount_id
-    eventHubName: eventHubLogging.outputs.eHName
+    eventHubName: eventHubName
     eventHubPrivateLinkResource: eventHubLogging.outputs.eHNamespaceId
     AmlName: aml.name
     amlPrivateLinkResource: aml.outputs.amlId
     vnetName: vnets.outputs.spokeVnetName
+    containerRegistryName: aml.outputs.ctrRegistryName
+    crPrivateLinkResource: aml.outputs.ctrRegistryId
   }
 }
 
@@ -273,9 +285,27 @@ module createDatabricksCluster './databricks/deployment.template.bicep' = {
     storageKey: adlsGen2.outputs.key1
     evenHubKey: eventHubLogging.outputs.eHPConnString
     eventHubId: eventHubLogging.outputs.eHubNameId
+    deployADBCluster: deployADBCluster
+    adb_pat_lifetime: adb_pat_lifetime
+    adb_cluster_name: adb_cluster_name
+    adb_spark_version: adb_spark_version
+    adb_node_type: adb_node_type
+    adb_num_worker: adb_num_worker
+    adb_auto_terminate_min: adb_auto_terminate_min
   }
 }
 
+module AksForAml 'aks/standalone-aks.template.bicep' = {
+  scope: rg
+  name: 'CreateAksCluster'
+  params: {
+    aksSubnetId:  vnets.outputs.aksSubnet_id
+    aksAgentCount: aksAgentCount
+    aksAgentVMSize: aksAgentVMSize
+    dnsPrefix: aksDNSPrefix
+    clusterName: aksAmlComputeName
+  }
+}
 module aml './aml/machinelearning.template.bicep' = {
   scope: rg
   name: 'MLWorkspace'
@@ -285,38 +315,25 @@ module aml './aml/machinelearning.template.bicep' = {
     keyVaultIdentifierId: keyVault.outputs.keyvault_id
     storageAccount: adlsGen2.outputs.storageaccount_id
     applicationInsightsName: applicationInsightsName
-  }
-}
-
-module AksForAml './aks/aks-for-aml.template.bicep' = {
-  scope: rg
-  name: 'AksForAml'
-  params: {
-    amlWorkspaceName: aml.outputs.amlWkspName
-    sslLeafName: sslLeafName
-    aksAgentCount:aksAgentCount
-    aksAgentVMSize: aksAgentVMSize
+    aksClusterId: AksForAml.outputs.aksClusterResourceId
     aksAmlComputeName: aksAmlComputeName
+    aksClusterPrincipleId:AksForAml.outputs.kubeletidentity
+    sslLeafName: sslLeafName
+    linkAkstoAml: linkAkstoAml 
   }
 }
 
-// output resourceGroupName string = rg.name
-// output keyVaultName string = keyVaultName
-// output adbWorkspaceName string = adbWorkspaceName
-// output storageAccountName string = storageAccountName
-// output storageKey1 string = adlsGen2.outputs.key1
-// output storageKey2 string = adlsGen2.outputs.key2
-// output databricksWksp string = adb.outputs.databricks_workspace_id
-// output databricks_workspaceUrl string = adb.outputs.databricks_workspaceUrl
-// output keyvault_id string = keyVault.outputs.keyvault_id
-// output keyvault_uri string = keyVault.outputs.keyvault_uri
-// output logAnalyticsWkspId string = loganalytics.outputs.logAnalyticsWkspId
-// output logAnalyticsprimarySharedKey string = loganalytics.outputs.primarySharedKey
-// output logAnalyticssecondarySharedKey string = loganalytics.outputs.secondarySharedKey
-// output eHNamespaceId string = eventHubLogging.outputs.eHNamespaceId
-// output eHubNameId string = eventHubLogging.outputs.eHubNameId
-// output eHAuthRulesId string = eventHubLogging.outputs.eHAuthRulesId
-// output eHPConnString string = eventHubLogging.outputs.eHPConnString
-// output dsOutputs object = createDatabricksCluster.outputs.patOutput
-// output adbCluster object = createDatabricksCluster.outputs.adbCluster
-// output amlProperties object = aml.outputs.amlProperties
+module UpdateSecretsKeyVault './keyvault/keyvaultsecrets.template.bicep' = {
+  scope: rg
+  name: 'UpdateSecretsKeyVault'
+  params: {
+    EventHubPK: eventHubLogging.outputs.eHPConnString
+    keyVaultName: keyVaultName
+    LogAWkspId: loganalytics.outputs.logAnalyticsWkspId
+    LogAWkspkey: loganalytics.outputs.primarySharedKey
+    StorageAccountKey1: adlsGen2.outputs.key1
+    StorageAccountKey2: adlsGen2.outputs.key2
+    DbPATKey: createDatabricksCluster.outputs.patToken
+    updateAKVKeys: updateAKVKeys
+  }
+}

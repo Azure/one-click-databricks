@@ -16,7 +16,7 @@ libraries='[
         },
         {
             "maven": {
-                "coordinates": "com.databricks.labs:overwatch_2.12:0.4.13"
+                "coordinates": "com.databricks.labs:overwatch_2.12:0.5.0.4"
             }
         },
         {
