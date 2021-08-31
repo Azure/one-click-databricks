@@ -20,6 +20,9 @@ bicep_output=$(az deployment sub create \
     --template-file main.bicep \
     --parameters adminUsername=$username \
     --parameters adminPassword=$password \
+    --parameters linkAkstoAml=true \
+    --parameters deployADBCluster=true \
+    --parameters updateAKVKeys=true \
     --only-show-errors)
 
 if [[ -z "$bicep_output" ]]; then

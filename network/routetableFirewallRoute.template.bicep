@@ -1,4 +1,3 @@
-
 param routeTableName string
 param firewallPrivateIp string
 
@@ -11,4 +10,3 @@ resource routeTableName_Firewall_Route 'Microsoft.Network/routeTables/routes@202
     hasBgpOverride: false
   }
 }
-

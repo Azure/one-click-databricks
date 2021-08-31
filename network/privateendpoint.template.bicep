@@ -8,18 +8,13 @@ param storageAccountName string
 param keyvaultPrivateLinkResource string
 
 @description('keyvault name.')
-param keyvaultName string
+param keyvaultName string = 'KeyVault'
 
 @description('event hub name.')
 param eventHubName string
 
 @description('EventHub Private Link resource.')
 param eventHubPrivateLinkResource string
-
-var targetSubResourceDfs = 'dfs'
-var targetSubResourceVault = 'vault'
-var targetSubResourceEventHub = 'namespace'
-var targetSubResourceAml = 'amlworkspace'
 
 @description('Vnet name for private link')
 param vnetName string
@@ -30,32 +25,41 @@ param privateLinkSubnetId string
 @description('Privatelink subnet Id')
 param privateLinkLocation string = resourceGroup().location
 
-var privateDnsNameStorage_var = 'privatelink.dfs.${environment().suffixes.storage}'
-var storageAccountPrivateEndpointName_var = '${storageAccountName}privateendpoint'
+var privateDnsNameStorageDfs_var = 'privatelink.dfs.${environment().suffixes.storage}'
+var privateDnsNameStorageBlob_var = 'privatelink.blob.${environment().suffixes.storage}'
+var privateDnsNameStorageFile_var = 'privatelink.file.${environment().suffixes.storage}'
+var adlsPrivateDnsZoneName_var = '${toLower(storageAccountName)}-dfs-Privateendpoint'
+var filePrivateDnsZoneName_var = '${toLower(storageAccountName)}-file-Privateendpoint'
+var blobPrivateDnsZoneName_var = '${toLower(storageAccountName)}-blob-Privateendpoint'
 
 var privateDnsNameVault_var = 'privatelink.vaultcore.azure.net'
-var keyvaultPrivateEndpointName_var = '${keyvaultName}privateendpoint'
+var keyvaultPrivateEndpointName_var = '${toLower(keyvaultName)}-Privateendpoint'
 
 var privateDnsNameEventHub_var = 'privatelink.servicebus.windows.net'
-var eventHubPrivateEndpointName_var = '${eventHubName}privateendpoint'
+var eventHubPrivateEndpointName_var = '${(eventHubName)}-Privateendpoint'
 
 param AmlName string
 param amlPrivateLinkResource string
 var privateDnsNameAmlApi_var = 'privatelink.api.azureml.ms'
 var privateDnsNameAmlNotebook_var = 'privatelink.notebooks.azure.net'
-var amlPrivateEndpointName_var = '${AmlName}privateendpoint'
+var amlPrivateEndpointName_var = '${AmlName}-Privateendpoint'
+
+param containerRegistryName string
+param crPrivateLinkResource string
+var privateDnsNameCr_var = 'privatelink.azurecr.io'
+var crPrivateEndpointName_var = '${containerRegistryName}-Privateendpoint'
 
 resource storageAccountPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02-01' = {
-  name: storageAccountPrivateEndpointName_var
+  name: adlsPrivateDnsZoneName_var
   location: privateLinkLocation
   properties: {
     privateLinkServiceConnections: [
       {
-        name: storageAccountPrivateEndpointName_var
+        name: adlsPrivateDnsZoneName_var
         properties: {
           privateLinkServiceId: storageAccountPrivateLinkResource
           groupIds: [
-            targetSubResourceDfs
+            'dfs'
           ]
         }
       }
@@ -65,8 +69,49 @@ resource storageAccountPrivateEndpointName 'Microsoft.Network/privateEndpoints@2
     }
   }
 }
-resource privateDnsNameStorage 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: privateDnsNameStorage_var
+resource fileStorageAccountPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02-01' = {
+  name: filePrivateDnsZoneName_var
+  location: privateLinkLocation
+  properties: {
+    privateLinkServiceConnections: [
+      {
+        name: filePrivateDnsZoneName_var
+        properties: {
+          privateLinkServiceId: storageAccountPrivateLinkResource
+          groupIds: [
+            'file'
+          ]
+        }
+      }
+    ]
+    subnet: {
+      id: privateLinkSubnetId
+    }
+  }
+}
+resource blobStorageAccountPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02-01' = {
+  name: blobPrivateDnsZoneName_var
+  location: privateLinkLocation
+  properties: {
+    privateLinkServiceConnections: [
+      {
+        name: blobPrivateDnsZoneName_var
+        properties: {
+          privateLinkServiceId: storageAccountPrivateLinkResource
+          groupIds: [
+            'blob'
+          ]
+        }
+      }
+    ]
+    subnet: {
+      id: privateLinkSubnetId
+    }
+  }
+}
+
+resource privateDnsNameStorageDfs 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: privateDnsNameStorageDfs_var
   location: 'global'
   tags: {}
   properties: {}
@@ -74,9 +119,50 @@ resource privateDnsNameStorage 'Microsoft.Network/privateDnsZones@2020-06-01' = 
     storageAccountPrivateEndpointName
   ]
 }
-resource privateDnsNameStorage_vnetName 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  parent: privateDnsNameStorage
-  name: vnetName
+resource privateDnsNameStorageFile 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: privateDnsNameStorageFile_var
+  location: 'global'
+  tags: {}
+  properties: {}
+  dependsOn: [
+    fileStorageAccountPrivateEndpointName
+  ]
+}
+resource privateDnsNameStorageBlob 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: privateDnsNameStorageBlob_var
+  location: 'global'
+  tags: {}
+  properties: {}
+  dependsOn: [
+    blobStorageAccountPrivateEndpointName
+  ]
+}
+
+resource privateDnsNameStorageDfs_vnetName 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsNameStorageDfs
+  name: 'dfs_link_to_${toLower(vnetName)}'
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: resourceId('Microsoft.Network/virtualNetworks', vnetName)
+    }
+    registrationEnabled: false
+  }
+}
+resource privateDnsNameStorageFile_vnetName 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsNameStorageFile
+  name: 'file_link_to_${toLower(vnetName)}'
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: resourceId('Microsoft.Network/virtualNetworks', vnetName)
+    }
+    registrationEnabled: false
+  }
+}
+resource privateDnsNameStorageBob_vnetName 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsNameStorageBlob
+  name: 'file_link_to_${toLower(vnetName)}'
   location: 'global'
   properties: {
     virtualNetwork: {
@@ -93,13 +179,41 @@ resource storageAccountPrivateEndpointName_default 'Microsoft.Network/privateEnd
       {
         name: 'privatelink-dfs-core-windows-net'
         properties: {
-          privateDnsZoneId: privateDnsNameStorage.id
+          privateDnsZoneId: privateDnsNameStorageDfs.id
         }
       }
     ]
   }
 }
-
+resource storageAccountFilePrivateEndpointName_default 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-02-01' = {
+  parent: fileStorageAccountPrivateEndpointName
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'privatelink-file-core-windows-net'
+        properties: {
+          privateDnsZoneId: privateDnsNameStorageFile.id
+        }
+      }
+    ]
+  }
+}
+resource storageAccountBlobPrivateEndpointName_default 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-02-01' = {
+  parent: blobStorageAccountPrivateEndpointName
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'privatelink-blob-core-windows-net'
+        properties: {
+          privateDnsZoneId: privateDnsNameStorageBlob.id
+        }
+      }
+    ]
+  }
+}
+// Configure Private Link for KeyVault
 resource keyvaultPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02-01' = {
   name: keyvaultPrivateEndpointName_var
   location: privateLinkLocation
@@ -110,7 +224,7 @@ resource keyvaultPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02
         properties: {
           privateLinkServiceId: keyvaultPrivateLinkResource
           groupIds: [
-            targetSubResourceVault
+            'vault'
           ]
         }
       }
@@ -156,6 +270,8 @@ resource keyvaultPrivateEndpointName_default 'Microsoft.Network/privateEndpoints
   }
 }
 
+// Configure Private Link for Event Hub
+
 resource eventHubPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02-01' = {
   name: eventHubPrivateEndpointName_var
   location: privateLinkLocation
@@ -166,7 +282,7 @@ resource eventHubPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02
         properties: {
           privateLinkServiceId: eventHubPrivateLinkResource
           groupIds: [
-            targetSubResourceEventHub
+            'namespace'
           ]
         }
       }
@@ -222,7 +338,7 @@ resource amlPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02-01' 
         properties: {
           privateLinkServiceId: amlPrivateLinkResource
           groupIds: [
-            targetSubResourceAml
+            'amlworkspace'
           ]
         }
       }
@@ -279,6 +395,64 @@ resource privateEndpointName_default 'Microsoft.Network/privateEndpoints/private
         name: 'privatelink-notebooks-azure-net'
         properties: {
           privateDnsZoneId: privatelink_notebooks_azure_net.id
+        }
+      }
+    ]
+  }
+}
+
+// Configure Private Link for Container Registry
+
+resource containerRegistryPrivateEndpointName 'Microsoft.Network/privateEndpoints@2021-02-01' = {
+  name: crPrivateEndpointName_var
+  location: privateLinkLocation
+  properties: {
+    privateLinkServiceConnections: [
+      {
+        name: crPrivateEndpointName_var
+        properties: {
+          privateLinkServiceId: crPrivateLinkResource
+          groupIds: [
+            'registry'
+          ]
+        }
+      }
+    ]
+    subnet: {
+      id: privateLinkSubnetId
+    }
+  }
+}
+
+resource privateDnsNameContainerRegistry 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: privateDnsNameCr_var
+  location: 'global'
+  dependsOn: [
+    containerRegistryPrivateEndpointName
+  ]
+}
+
+resource privateDnsNameContainerRegistry_vnetName 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsNameContainerRegistry
+  name: vnetName
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: resourceId('Microsoft.Network/virtualNetworks', vnetName)
+    }
+    registrationEnabled: false
+  }
+}
+
+resource privateDnsNameContainerRegistry_default 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-02-01' = {
+  parent: containerRegistryPrivateEndpointName
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'privatelink-azurecr-io'
+        properties: {
+          privateDnsZoneId: privateDnsNameContainerRegistry.id
         }
       }
     ]

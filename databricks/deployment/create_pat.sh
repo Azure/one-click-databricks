@@ -1,7 +1,7 @@
 #/bin/bash -e
 pat_token_config=$(jq -n -c \
     --arg ls "$PAT_LIFETIME" \
-    --arg co "Example Token" \
+    --arg co "Example Token created by Bicep deployment" \
     '{lifetime_seconds: ($ls|tonumber),
      comment: $co}')
 

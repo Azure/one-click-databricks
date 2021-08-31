@@ -52,6 +52,27 @@ param clinetDevicesSubnetCidr string
 
 var securityGroupId = resourceId('Microsoft.Network/networkSecurityGroups', securityGroupName)
 
+var serviceEndpoints = [
+  {
+    service: 'Microsoft.Storage'
+    locations: [
+      resourceGroup().location
+    ]
+  }
+  {
+    service: 'Microsoft.ContainerRegistry'
+    locations: [
+      resourceGroup().location
+    ]
+  }
+  {
+    service: 'Microsoft.KeyVault'
+    locations: [
+      resourceGroup().location
+    ]
+  }
+]
+
 resource hubVnetName_resource 'Microsoft.Network/virtualNetworks@2020-08-01' = {
   name: hubVnetName
   location: vnetLocation
@@ -68,11 +89,6 @@ resource hubVnetName_resource 'Microsoft.Network/virtualNetworks@2020-08-01' = {
           addressPrefix: firewallSubnetCidr
           privateEndpointNetworkPolicies: 'Enabled'
           privateLinkServiceNetworkPolicies: 'Enabled'
-          serviceEndpoints: [
-            {
-              service: 'Microsoft.Storage'
-            }
-          ]
         }
       }
       {
@@ -123,14 +139,7 @@ resource spokeVnetName_resource 'Microsoft.Network/virtualNetworks@2020-08-01' =
           routeTable: {
             id: resourceId('Microsoft.Network/routeTables', routeTableName)
           }
-          serviceEndpoints: [
-            {
-              service: 'Microsoft.Storage'
-              locations: [
-                resourceGroup().location
-              ]
-            }
-          ]
+          serviceEndpoints: serviceEndpoints
           delegations: [
             {
               name: 'databricks-del-public'
@@ -165,16 +174,16 @@ resource spokeVnetName_resource 'Microsoft.Network/virtualNetworks@2020-08-01' =
         name: privatelinkSubnetName
         properties: {
           addressPrefix: privatelinkSubnetCidr
-          delegations: []
           privateEndpointNetworkPolicies: 'Disabled'
           privateLinkServiceNetworkPolicies: 'Enabled'
+          serviceEndpoints: serviceEndpoints
         }
       }
       {
         name: aksSubnetName
         properties: {
           addressPrefix: AksSubnetCidr
-          delegations: []
+          serviceEndpoints:serviceEndpoints
         }
       }
     ]
@@ -204,3 +213,7 @@ output databricksPublicSubnetId string = resourceId('Microsoft.Network/virtualNe
 output spokeVnetName string = spokeVnetName
 
 output hubVnetName string = hubVnetName
+
+output aksSubnet_id string = resourceId('Microsoft.Network/virtualNetworks/subnets', spokeVnetName, aksSubnetName)
+
+output spokeVnetId string = spokeVnetName_resource.id

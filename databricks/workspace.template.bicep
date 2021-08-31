@@ -50,10 +50,7 @@ resource adbWorkspaceName_resource 'Microsoft.Databricks/workspaces@2018-04-01' 
   dependsOn: []
 }
 
-// output databricks_workspace_name string = adbWorkspaceName
-// output databricks_location string = adbWorkspaceLocation
+
 output databricks_workspace_id string = adbWorkspaceName_resource.id
 output databricks_workspaceUrl string = adbWorkspaceName_resource.properties.workspaceUrl
-// output databricks_sku_tier string = adbWorkspaceSkuTier
 output databricks_dbfs_storage_accountName string = adbWorkspaceName_resource.properties.parameters.storageAccountName.value
-// output databricks_dbfs_storage_accountName string = adbWorkspaceName_resource.properties.parameters.storageAccountName.value
